@@ -1,0 +1,52 @@
+select * into q1_sp_index from(
+
+select dbo.[s&p_Index_Dim].Date ,
+round(dbo.[s&p_Index_Dim].[Open],2)  as "open",
+round(dbo.[s&p_Index_Dim].high,2)  as "high",
+round(dbo.[s&p_Index_Dim].Low,2)  as "low",
+round(dbo.[s&p_Index_Dim].[close],2)  as "close",
+round(dbo.[s&p_Index_Dim].[Volume],2)  as "volume",
+-- calculate the change ll ta2keed
+--[close]-LAG([close]) over (order by [date] asc) as "change",
+dbo.[s&p_Index_Dim].change as "change % ",
+ROUND(([Close] - COALESCE(LAG([Close],7) over (order by [DATE] ASC),[Close]))/COALESCE(LAG([Close],7) over (order by [DATE] ASC),[Close]),5)*100 as "Weekly performance %",
+ROUND(([Close] - COALESCE(LAG([Close],30) over (order by [DATE] ASC),[Close]))/COALESCE(LAG([Close],30) over (order by [DATE] ASC),[Close]),5)*100 as "Monthly performance %",
+ROUND(MAX([High]) over (order by [DATE]  ROWS BETWEEN 252 PRECEDING AND CURRENT ROW),2) as "52_week_high",
+			ROUND(MIN([Low]) over (order by [DATE]  ROWS BETWEEN 252 PRECEDING AND CURRENT ROW),2) as "52_week_low",
+
+MAX([Volume]) over(PARTITION BY year([date])) as "volume per year"
+		
+from dbo.[s&p_Index_Dim]) query1
+
+----------------------------------------------------------------------------------------------
+select * into company_sector_performance from(
+select c.Name,c.Sector,c.Industry,p.Chg_1D,p.Chg_1M,p.Chg_1W,p.Yearly_perf,p.Volatility_1D,f.* from 
+dbo.Company_Info_Dim c 
+left join dbo.performance_Dim p on c."Symbol" = p."Symbol"
+left join dbo.Fact_Stock f on f."Symbol" = c."Symbol" ) q2;
+---------------------------------------------------------------------------------------------
+
+select * into Q2_Fact_Daily_Monitoring from(
+
+Select
+	[dbo].[Fact_Daily_Monitoring].[Date],
+		[dbo].[Fact_Daily_Monitoring].[Symbol],
+		round([dbo].[Fact_Daily_Monitoring].[Open],2)  as "open",
+		round([dbo].[Fact_Daily_Monitoring].[high],2)  as "high",
+		round([dbo].[Fact_Daily_Monitoring].[low],2)  as "low",
+		round([dbo].[Fact_Daily_Monitoring].[close],2)  as "close",
+		ROUND(COALESCE(LAG([Close]) over (order by [DATE] ASC),[Close]),4) as Previous_close,
+		round([dbo].[Fact_Daily_Monitoring].[Volume],2)  as "volume",
+		COALESCE(LAG([dbo].[Fact_Daily_Monitoring].[Volume]) over (order by [DATE] ASC),[dbo].[Fact_Daily_Monitoring].[Volume]) as Previous_Volume
+
+
+from [dbo].[Fact_Daily_Monitoring]) q3;
+------------------------------------------------------------------------------------------------
+select * into max_min_comp from(
+select [symbol],max([volume]/1000000) as vol from Fact_Daily_Monitoring 
+group by Symbol 
+order by vol desc 
+union
+select [symbol],min([volume]) as vol from Fact_Daily_Monitoring 
+group by Symbol 
+order by vol asc) q4 ;
